@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>FM Coverage Contour Builder</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <p class="eyebrow">Broadcast Planning Utility</p>
+        <h1>FM Coverage Contour Builder</h1>
+        <p class="subhead">Enter station parameters, generate an approximate contour, view it on the map, and export as KML.</p>
+        <div class="hero-tools">
+          <button id="themeToggleBtn" type="button" class="theme-toggle-btn" aria-pressed="false">Dark Mode</button>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="panel controls-panel">
+          <form id="station-form">
+            <div class="form-grid">
+              <label>
+                Station Name
+                <input id="stationName" name="stationName" type="text" placeholder="Example FM 101.7">
+              </label>
+
+              <label class="span-2">
+                Location String (Optional)
+                <input id="stationLocationText" name="stationLocationText" type="text" placeholder="39°06'59.2&quot;N 84°30'06.8&quot;W or 39.116444, -84.501889">
+                <span class="hint">If provided, this auto-fills latitude/longitude when you generate coverage.</span>
+              </label>
+
+              <label>
+                Latitude
+                <input id="latitude" name="latitude" type="number" step="0.000001" min="-90" max="90" value="40.712800" required>
+              </label>
+
+              <label>
+                Longitude
+                <input id="longitude" name="longitude" type="number" step="0.000001" min="-180" max="180" value="-74.006000" required>
+              </label>
+
+              <label>
+                ERP (Watts)
+                <input id="erpW" name="erpW" type="number" min="1" step="1" value="50000" required>
+              </label>
+
+              <label>
+                Tower Height (m)
+                <input id="towerHeightM" name="towerHeightM" type="number" min="1" step="1" value="300" required>
+              </label>
+
+              <label>
+                Transmission Type
+                <select id="mode" name="mode">
+                  <option value="analog">Analog FM</option>
+                  <option value="hd">HD Radio</option>
+                </select>
+              </label>
+
+              <label>
+                Directional Pattern
+                <select id="patternType" name="patternType">
+                  <option value="omni">Omnidirectional</option>
+                  <option value="cardioidNorth">Cardioid (North)</option>
+                  <option value="cardioidEast">Cardioid (East)</option>
+                  <option value="figure8NS">Figure-8 (North/South)</option>
+                  <option value="figure8EW">Figure-8 (East/West)</option>
+                  <option value="custom">Custom Gain Table</option>
+                </select>
+              </label>
+
+              <label>
+                Pattern Strength (dB Front/Back)
+                <input id="patternStrengthDb" name="patternStrengthDb" type="range" min="0" max="18" step="1" value="6">
+                <span id="patternStrengthValue" class="hint">6 dB</span>
+              </label>
+
+              <label>
+                Antenna Type
+                <select id="antennaType" name="antennaType">
+                  <option value="circular">Circular Polarized</option>
+                  <option value="panel">Panel Array</option>
+                  <option value="slot">Slot Antenna</option>
+                  <option value="horizontal">Horizontal Dipole</option>
+                  <option value="vertical">Vertical Dipole</option>
+                </select>
+              </label>
+
+              <label>
+                Transmitter Surroundings (Base Obstruction)
+                <select id="obstructionType" name="obstructionType">
+                  <option value="open">Open / Flat</option>
+                  <option value="rural">Rural / Light Trees</option>
+                  <option value="suburban">Suburban / Mixed Trees</option>
+                  <option value="urban">Urban (Calibrated light)</option>
+                  <option value="denseUrban">Dense Urban (Calibrated suburban-like)</option>
+                </select>
+              </label>
+            </div>
+
+            <label id="customPatternWrap" class="hidden">
+              Custom Pattern Table (azimuth,gainDb per line)
+              <textarea id="customPattern" name="customPattern" rows="5" placeholder="0,0&#10;90,-2&#10;180,-6&#10;270,-2"></textarea>
+            </label>
+
+            <fieldset class="booster-box">
+              <legend>Optional Booster</legend>
+              <label class="inline-switch">
+                <input id="useBooster" name="useBooster" type="checkbox">
+                Enable Booster Contour
+              </label>
+
+              <div id="boosterFields" class="form-grid hidden">
+                <label class="span-2">
+                  Booster Location String (Optional)
+                  <input id="boosterLocationText" name="boosterLocationText" type="text" placeholder="39°06'59.2&quot;N 84°30'06.8&quot;W or 39.116444, -84.501889">
+                  <span class="hint">If provided, this auto-fills booster latitude/longitude when generating coverage.</span>
+                </label>
+
+                <label>
+                  Booster Latitude
+                  <input id="boosterLatitude" name="boosterLatitude" type="number" step="0.000001" min="-90" max="90" value="40.752800">
+                </label>
+
+                <label>
+                  Booster Longitude
+                  <input id="boosterLongitude" name="boosterLongitude" type="number" step="0.000001" min="-180" max="180" value="-73.976000">
+                </label>
+
+                <label>
+                  Booster ERP (Watts)
+                  <input id="boosterErpW" name="boosterErpW" type="number" min="1" step="1" value="250">
+                </label>
+
+                <label>
+                  Booster Height (m)
+                  <input id="boosterHeightM" name="boosterHeightM" type="number" min="1" step="1" value="40">
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset class="batch-box">
+              <legend>Batch Town/City Obstruction Check</legend>
+              <p class="hint">Paste up to 1,000 lines: <code>name, latitude, longitude, obstruction(optional)</code>.</p>
+              <label>
+                Town/City Rows
+                <textarea id="batchLocations" name="batchLocations" rows="8" placeholder="Albany,42.6526,-73.7562,urban&#10;Schenectady,42.8142,-73.9396,suburban&#10;42.8864,-78.8784,denseUrban"></textarea>
+                <span class="hint">Allowed values: open, rural, suburban, urban, denseUrban. If omitted, transmitter surroundings value above is used.</span>
+              </label>
+              <label class="inline-switch">
+                <input id="batchUseBaseObstruction" name="batchUseBaseObstruction" type="checkbox">
+                Use transmitter surroundings for all batch rows
+              </label>
+              <p class="hint">When checked, this overrides the 4th-column obstruction in every row. Leave unchecked to use each row's urban/rural/suburban value.</p>
+              <div class="batch-settings-grid">
+                <label>
+                  Great Max (%)
+                  <input id="batchGreatPct" name="batchGreatPct" type="number" min="5" max="80" step="1" value="33">
+                </label>
+                <label>
+                  Strong Max (%)
+                  <input id="batchStrongPct" name="batchStrongPct" type="number" min="10" max="95" step="1" value="66">
+                </label>
+                <label>
+                  Suburban Edge Cutoff (%)
+                  <input id="batchSuburbanEdgePct" name="batchSuburbanEdgePct" type="number" min="50" max="100" step="1" value="96">
+                </label>
+                <label>
+                  Urban Edge Cutoff (%)
+                  <input id="batchUrbanEdgePct" name="batchUrbanEdgePct" type="number" min="50" max="100" step="1" value="88">
+                </label>
+                <label>
+                  Dense Urban Edge Cutoff (%)
+                  <input id="batchDenseUrbanEdgePct" name="batchDenseUrbanEdgePct" type="number" min="40" max="100" step="1" value="80">
+                </label>
+                <label>
+                  Suburban Penalty (Levels)
+                  <input id="batchSuburbanPenalty" name="batchSuburbanPenalty" type="number" min="0" max="3" step="1" value="0">
+                </label>
+                <label>
+                  Urban Penalty (Levels)
+                  <input id="batchUrbanPenalty" name="batchUrbanPenalty" type="number" min="0" max="3" step="1" value="1">
+                </label>
+                <label>
+                  Dense Urban Penalty (Levels)
+                  <input id="batchDenseUrbanPenalty" name="batchDenseUrbanPenalty" type="number" min="0" max="3" step="1" value="2">
+                </label>
+              </div>
+              <p class="hint">Penalty levels demote status by steps (Great -> Strong -> Moderate -> Not Covered).</p>
+              <div class="actions batch-actions">
+                <button id="runBatchBtn" type="button">Run Batch Obstruction Check</button>
+                <button id="exportBatchCsvBtn" type="button" disabled>Export Batch CSV</button>
+              </div>
+              <div id="batchSummary" class="batch-summary hidden">
+                <p id="batchCount">Towns analyzed: -</p>
+                <p id="batchReachable">Covered towns: -</p>
+                <p id="batchMedianMargin">Median margin: -</p>
+                <p id="batchWorstMargin">Worst margin: -</p>
+              </div>
+              <div id="batchLists" class="batch-lists hidden">
+                <article>
+                  <h3 id="batchCoveredTitle">Covered Towns (0)</h3>
+                  <textarea id="batchCoveredNames" rows="8" readonly></textarea>
+                </article>
+                <article>
+                  <h3 id="batchNotCoveredTitle">Not Covered Towns (0)</h3>
+                  <textarea id="batchNotCoveredNames" rows="8" readonly></textarea>
+                </article>
+              </div>
+              <p id="batchMessage" class="message" aria-live="polite"></p>
+            </fieldset>
+
+            <div class="actions">
+              <button id="generateBtn" type="submit">Generate Coverage</button>
+              <button id="exportKmlBtn" type="button" disabled>Export KML</button>
+            </div>
+            <p id="formMessage" class="message" aria-live="polite"></p>
+          </form>
+        </section>
+
+        <section class="panel map-panel">
+          <div id="map" aria-label="Coverage map"></div>
+          <div class="legend">
+            <span><i class="swatch station"></i>Station Contour</span>
+            <span><i class="swatch booster"></i>Booster Contour</span>
+          </div>
+          <div id="metrics" class="metrics">
+            <article>
+              <h2>Station</h2>
+              <p id="stationRadius">Radius: -</p>
+              <p id="stationArea">Area: -</p>
+            </article>
+            <article>
+              <h2>Booster</h2>
+              <p id="boosterRadius">Radius: -</p>
+              <p id="boosterArea">Area: -</p>
+            </article>
+          </div>
+          <p class="disclaimer">Approximation only. Not for regulatory filing, licensing, or interference protection studies.</p>
+        </section>
+      </main>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="app.js?v=20260306-14"></script>
+  </body>
+</html>
